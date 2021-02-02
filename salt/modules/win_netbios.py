@@ -55,7 +55,7 @@ def get(interface=None):
         for config in c.Win32_NetworkAdapterConfiguration(IPEnabled=True):
             current = {
                 config.Description: {
-                    "Index": config.Index,
+                    "Index": config.InterfaceIndex,
                     "NetBIOS": list(TcpipNetbiosOptions.keys())[config.TcpipNetbiosOptions]
                 }
             }
@@ -113,7 +113,7 @@ def set(setting, interface=None):
 
             current = {
                 config.Description: {
-                    "Index": config.Index,
+                    "Index": config.InterfaceIndex,
                     "Result": result
                 }
             }
