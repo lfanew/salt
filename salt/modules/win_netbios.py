@@ -1,4 +1,5 @@
 import salt.utils.platform
+from collections import OrderedDict
 
 try:
     import wmi  # pylint: disable=import-error
@@ -10,11 +11,11 @@ except ImportError:
 # Define the module's virtual name
 __virtualname__ = "netbios"
 
-TcpipNetbiosOptions = [
-    "default",
-    "enabled",
-    "disabled"
-]
+TcpipNetbiosOptions = OrderedDict(
+    default=0,
+    enabled=1,
+    disabled=2
+)
 
 def __virtual__():
     """
@@ -55,7 +56,7 @@ def get(interface=None):
             current = {
                 config.Description: {
                     "Index": config.Index,
-                    "NetBIOS": TcpipNetbiosOptions[config.TcpipNetbiosOptions]
+                    "NetBIOS": list(TcpipNetbiosOptions.keys())[config.TcpipNetbiosOptions]
                 }
             }
             ret.append(current)
@@ -88,9 +89,35 @@ def set(setting, interface=None):
     """
 
     ret = []
+
+
+
     with salt.utils.winapi.Com():
         c = wmi.WMI()
-        for iface in c.Win32_NetworkAdapter(NetEnabled=True):
-            ret.append(iface.NetConnectionID)
-    return ret
 
+        if setting not in TcpipNetbiosOptions.keys():
+            return False
+
+        for config in c.Win32_NetworkAdapterConfiguration(IPEnabled=True):
+            return_code = config.SetTcpipNetbios(TcpipNetbiosOptions[setting])[0]
+
+            if return_code == 0:
+                result = "Success. Set NetBIOS to {0}.".format(setting)
+            elif return_code == 1:
+                result = "Success. Set NetBIOS to {0}. Reboot required."
+                __salt__["system.set_reboot_required_witnessed"]()
+            elif return_code == 100:
+                result = "DHCP not enabled. Cannot set to default."
+            else:
+                result = "Error setting NetBIOS to {0}. Error code: {1}".format(setting, return_code)
+
+            current = {
+                config.Description: {
+                    "Index": config.Index,
+                    "Result": result
+                }
+            }
+
+            ret.append(current)
+
+    return ret
